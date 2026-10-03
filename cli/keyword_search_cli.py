@@ -17,7 +17,7 @@ def main() -> None:
                 data = json.load(file)
             filtered_movies = []
             for movie in data.get("movies", []):
-                if args.query in movie.get("title", ""):
+                if args.query.lower() in movie.get("title", "").lower():
                     filtered_movies.append(movie)
 
             print(f"Searching for: {args.query}")
