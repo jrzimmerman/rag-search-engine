@@ -2,8 +2,12 @@ import argparse
 import json
 import string
 
+from nltk.stem import PorterStemmer
+
 PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
 MAX_RESULTS = 5
+
+stemmer = PorterStemmer()
 
 
 def normalize(text: str) -> str:
@@ -14,7 +18,7 @@ def tokenize(text: str, stop_words: list[str]) -> list[str]:
     tokens = []
     for token in normalize(text).split():
         if token not in stop_words:
-            tokens.append(token)
+            tokens.append(stemmer.stem(token))
     return tokens
 
 
