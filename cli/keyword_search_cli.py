@@ -3,6 +3,7 @@ import json
 import os
 import pickle
 import string
+import sys
 
 from nltk.stem import PorterStemmer
 
@@ -71,13 +72,14 @@ class InvertedIndex:
         with open(DOCMAP_PATH, "wb") as f:
             pickle.dump(self.docmap, f)
 
-
-def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool:
-    for query_token in query_tokens:
-        for title_token in title_tokens:
-            if query_token in title_token:
-                return True
-    return False
+    def load(self) -> None:
+        for path in (INDEX_PATH, DOCMAP_PATH):
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"{path} not found, run the build command first")
+        with open(INDEX_PATH, "rb") as f:
+            self.index = pickle.load(f)
+        with open(DOCMAP_PATH, "rb") as f:
+            self.docmap = pickle.load(f)
 
 
 def build_command() -> None:
@@ -85,8 +87,28 @@ def build_command() -> None:
     index.build()
     index.save()
 
-    docs = index.get_documents("merida")
-    print(f"First document for token 'merida' = {docs[0]}")
+
+def search_command(query: str) -> None:
+    index = InvertedIndex()
+    try:
+        index.load()
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    results = []
+    for token in tokenize(query, index.stop_words):
+        for doc_id in index.get_documents(token):
+            if doc_id not in results:
+                results.append(doc_id)
+            if len(results) == MAX_RESULTS:
+                break
+        if len(results) == MAX_RESULTS:
+            break
+
+    print(f"Searching for: {query}")
+    for position, doc_id in enumerate(results, start=1):
+        print(f"{position}. {index.docmap[doc_id]['title']} (ID: {doc_id})")
 
 
 def main() -> None:
@@ -102,20 +124,7 @@ def main() -> None:
 
     match args.command:
         case "search":
-            stop_words = load_stop_words()
-
-            query_tokens = tokenize(args.query, stop_words)
-            filtered_movies = []
-            for movie in load_movies():
-                title_tokens = tokenize(movie.get("title", ""), stop_words)
-                if has_matching_token(query_tokens, title_tokens):
-                    filtered_movies.append(movie)
-                    if len(filtered_movies) == MAX_RESULTS:
-                        break
-
-            print(f"Searching for: {args.query}")
-            for index, fm in enumerate(filtered_movies, start=1):
-                print(f"{index}. {fm.get('title')}")
+            search_command(args.query)
         case "build":
             build_command()
         case _:
